@@ -1,15 +1,11 @@
-const { Car } = require("../models");
+const { Car } = require("../../models");
 const { Op } = require("sequelize");
-const imagekit = require("../lib/imagekit");
-const capitalizeFirstLetter = require("../utils/sentenceCase");
-const formatDate = require("../utils/formatDate");
-const formatIDR = require("../utils/formatPrice");
+const imagekit = require("../../lib/imagekit");
 
-const carsPage = async (req, res) => {
+const getAllCars = async (req, res) => {
   try {
     const { category, search } = req.query;
 
-    const fullUrl = req.protocol + "://" + req.get("host") + req.originalUrl;
     let cars;
 
     const searchCriteria = {};
@@ -23,13 +19,12 @@ const carsPage = async (req, res) => {
     }
 
     cars = await Car.findAll({ where: searchCriteria });
-    res.render("index.ejs", {
-      fullUrl,
-      cars,
-      capitalizeFirstLetter,
-      formatDate,
-      formatIDR,
-      message: req.flash("message", ""),
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        cars,
+      },
     });
   } catch (error) {
     res.status(400).json({
@@ -39,20 +34,33 @@ const carsPage = async (req, res) => {
   }
 };
 
-const createPage = async (req, res) => {
+const getCarById = async (req, res) => {
   try {
-    res.render("create.ejs");
-  } catch (error) {
-    res.status(400).json({
-      status: "failed",
-      message: error.message,
+    const id = req.params.id;
+    const car = await Car.findOne({
+      where: {
+        id: id,
+      },
     });
-  }
+    res.status(200).json({
+      status: "success",
+      data: {
+        car,
+      },
+    });
+  } catch (error) {}
 };
 
 const createCar = async (req, res) => {
   const { name, price, category } = req.body;
   const file = req.file;
+
+  if (!file) {
+    return res.status(400).json({
+      status: "failed",
+      message: "File image is required.",
+    });
+  }
 
   // Get extension file
   const split = file.originalname.split(".");
@@ -65,28 +73,17 @@ const createCar = async (req, res) => {
   });
 
   try {
-    await Car.create({
+    const car = await Car.create({
       name,
       price,
       category,
       image: img.url,
     });
-
-    req.flash("message", "Disimpan");
-    res.redirect("/dashboard");
-  } catch (error) {
-    res.status(400).json({
-      status: "failed",
-      message: error.message,
-    });
-  }
-};
-
-const editPage = async (req, res) => {
-  try {
-    const car = await Car.findOne({ where: { id: req.params.id } });
-    res.render("edit.ejs", {
-      car,
+    res.status(201).json({
+      status: "success",
+      data: {
+        car,
+      },
     });
   } catch (error) {
     res.status(400).json({
@@ -121,8 +118,10 @@ const editCar = async (req, res) => {
       },
       { where: { id } }
     );
-    req.flash("message", "Diupdate");
-    res.redirect("/dashboard");
+    res.status(200).json({
+      status: "success",
+      message: `Data with ID ${id} is updated`,
+    });
   } catch (error) {
     res.status(400).json({
       status: "failed",
@@ -135,8 +134,11 @@ const removeCar = async (req, res) => {
   try {
     const id = req.params.id;
     await Car.destroy({ where: { id } });
-    req.flash("message", "Dihapus");
-    res.redirect("/dashboard");
+    res.status(200).json({
+      status: "success",
+      message: `Data with ID ${id} is removed`,
+      data: null,
+    });
   } catch (error) {
     res.status(400).json({
       status: "failed",
@@ -146,10 +148,9 @@ const removeCar = async (req, res) => {
 };
 
 module.exports = {
-  carsPage,
-  createPage,
+  getAllCars,
+  getCarById,
   createCar,
-  editPage,
   editCar,
   removeCar,
 };
